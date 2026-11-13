@@ -1,9 +1,15 @@
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:4000';
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 export const auth = {
   get: () => localStorage.getItem('token'),
+  role: () => localStorage.getItem('role') || 'admin',
+  username: () => localStorage.getItem('username') || '',
   set: (t: string) => localStorage.setItem('token', t),
-  clear: () => localStorage.removeItem('token'),
+  setUser: (username: string, role: string) => {
+    localStorage.setItem('username', username);
+    localStorage.setItem('role', role);
+  },
+  clear: () => { localStorage.removeItem('token'); localStorage.removeItem('role'); localStorage.removeItem('username'); },
 };
 
 async function req<T>(path: string, method = 'GET', body?: unknown): Promise<T> {

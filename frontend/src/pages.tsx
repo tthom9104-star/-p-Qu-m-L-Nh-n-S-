@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { api } from './api';
+import { useEffect, useState } from 'react';
+import { api, auth } from './api';
 import { useData } from './data';
-import type { EmployeeInput, Leave } from './types';
+import type { EmployeeInput, Leave, User } from './types';
 
 // ---------- tiện ích ----------
 const money = (n: number) => Number(n).toLocaleString('vi-VN') + 'đ';
@@ -68,7 +68,7 @@ function LeaveTable({ rows, actions }: { rows: Leave[]; actions?: boolean }) {
       <tbody>{rows.map(l => (
         <tr key={l.id}><td>{name(l.eid)}</td><td>{l.from_date}</td><td>{l.to_date}</td><td>{l.reason}</td>
           <td><span className={`tag ${cls(l.status)}`}>{l.status}</span></td>
-          {actions && <td>{l.status === 'Chờ duyệt' && <>
+          {actions && auth.role() !== 'viewer' && <td>{l.status === 'Chờ duyệt' && <>
             <button className="sm s" onClick={() => set(l.id, 'Đã duyệt')}>Duyệt</button>{' '}
             <button className="sm r" onClick={() => set(l.id, 'Từ chối')}>Từ chối</button></>}</td>}
         </tr>))}
@@ -105,17 +105,17 @@ export function Employees() {
       <div className="bar">
         <input placeholder="Tìm theo tên, email..." value={q} onChange={e => setQ(e.target.value)} />
         <select value={fd} onChange={e => setFd(e.target.value)}><option value="">Tất cả phòng ban</option>{depts.map(d => <option key={d.id}>{d.name}</option>)}</select>
-        <button onClick={() => { location.hash = 'emp-form'; }}>+ Thêm mới</button>
+        {auth.role() !== 'viewer' && <button onClick={() => { location.hash = 'emp-form'; }}>+ Thêm mới</button>}
         <button className="g" onClick={exp}>Xuất CSV</button>
       </div>
       <div className="tw"><table>
-        <thead><tr><th>Mã</th><th>Họ tên</th><th>Email</th><th>Phòng ban</th><th>Chức vụ</th><th>Trạng thái</th><th></th></tr></thead>
+        <thead><tr><th>Mã</th><th>Họ tên</th><th>Email</th><th>Phòng ban</th><th>Chức vụ</th><th>Trạng thái</th>{auth.role() !== 'viewer' && <th></th>}</tr></thead>
         <tbody>{rows.map(e => (
           <tr key={e.id}><td>NV{e.id}</td><td>{e.name}</td><td>{e.email}</td><td>{e.dept}</td><td>{e.pos}</td>
             <td><span className={`tag ${e.status === 'Đang làm' ? 'ok' : 'wa'}`}>{e.status}</span></td>
-            <td><button className="sm g" onClick={() => { location.hash = `emp-form/${e.id}`; }}>Sửa</button>{' '}
-              <button className="sm r" onClick={() => del(e.id)}>Xóa</button></td></tr>))}
-          {!rows.length && <tr><td colSpan={7}>Không có dữ liệu</td></tr>}
+            {auth.role() !== 'viewer' && <td><button className="sm g" onClick={() => { location.hash = `emp-form/${e.id}`; }}>Sửa</button>{' '}
+              <button className="sm r" onClick={() => del(e.id)}>Xóa</button></td>}</tr>))}
+          {!rows.length && <tr><td colSpan={auth.role() === 'viewer' ? 6 : 7}>Không có dữ liệu</td></tr>}
         </tbody></table></div>
     </div>
   </>;
@@ -166,12 +166,12 @@ export function Departments() {
   return <>
     <h1>Phòng ban</h1>
     <div className="card">
-      <div className="bar"><input placeholder="Tên phòng ban mới" value={name} onChange={e => setName(e.target.value)} /><button onClick={add}>Thêm</button></div>
+      {auth.role() !== 'viewer' && <div className="bar"><input placeholder="Tên phòng ban mới" value={name} onChange={e => setName(e.target.value)} /><button onClick={add}>Thêm</button></div>}
       <div className="tw"><table>
-        <thead><tr><th>Phòng ban</th><th>Số nhân viên</th><th>Tổng lương</th><th></th></tr></thead>
+        <thead><tr><th>Phòng ban</th><th>Số nhân viên</th><th>Tổng lương</th>{auth.role() !== 'viewer' && <th></th>}</tr></thead>
         <tbody>{depts.map(d => { const m = emps.filter(e => e.dept === d.name); return (
           <tr key={d.id}><td>{d.name}</td><td>{m.length}</td><td>{money(m.reduce((a, e) => a + Number(e.salary), 0))}</td>
-            <td><button className="sm r" onClick={() => void run(() => api.del(`/api/departments/${d.id}`))}>Xóa</button></td></tr>); })}
+            {auth.role() !== 'viewer' && <td><button className="sm r" onClick={() => void run(() => api.del(`/api/departments/${d.id}`))}>Xóa</button></td>}</tr>); })}
         </tbody></table></div>
     </div>
   </>;
@@ -189,8 +189,8 @@ export function AttendancePage() {
     <div className="card">
       <div className="bar">
         <select value={eid} onChange={e => setEid(Number(e.target.value))}>{emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
-        <button className="s" onClick={() => void check('in')}>Check-in</button>
-        <button onClick={() => void check('out')}>Check-out</button>
+        {auth.role() !== 'viewer' && <><button className="s" onClick={() => void check('in')}>Check-in</button>
+          <button onClick={() => void check('out')}>Check-out</button></>}
         <span style={{ color: 'var(--mu)' }}>Hôm nay: {today()}</span>
       </div>
       <div className="tw"><table>
@@ -215,15 +215,15 @@ export function LeavePage() {
   };
   return <>
     <h1>Nghỉ phép</h1>
-    <div className="card"><h3>Tạo đơn mới</h3>
+    {auth.role() !== 'viewer' && <div className="card"><h3>Tạo đơn mới</h3>
       <div className="bar">
         <select value={eid} onChange={e => setEid(Number(e.target.value))}>{emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
         <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
         <input type="date" value={to} onChange={e => setTo(e.target.value)} />
         <input placeholder="Lý do" value={reason} onChange={e => setReason(e.target.value)} />
         <button onClick={send}>Gửi đơn</button>
-      </div></div>
-    <div className="card"><h3>Danh sách đơn</h3><LeaveTable rows={leaves} actions /></div>
+      </div></div>}
+    <div className="card"><h3>Danh sách đơn</h3><LeaveTable rows={leaves} actions={auth.role() !== 'viewer'} /></div>
   </>;
 }
 
@@ -260,20 +260,20 @@ export function Recruitment() {
   return <>
     <h1>Tuyển dụng</h1>
     <div className="card">
-      <div className="bar">
+      {auth.role() !== 'viewer' && <div className="bar">
         <input placeholder="Tên ứng viên" value={name} onChange={e => setName(e.target.value)} />
         <select value={job} onChange={e => setJob(Number(e.target.value))}>{jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}</select>
         <button onClick={add}>Thêm ứng viên</button>
-      </div>
+      </div>}
       <div className="kan">{STAGES.map((s, i) => { const list = cands.filter(c => c.stage === i); return (
         <div key={s}><b>{s}</b> <span className="tag">{list.length}</span>
           {list.map(c => (
             <div className="kc" key={c.id}>{c.name}<br /><small style={{ color: 'var(--mu)' }}>{title(c.job_id)}</small>
-              <div className="bar" style={{ margin: '6px 0 0' }}>
+              {auth.role() !== 'viewer' && <div className="bar" style={{ margin: '6px 0 0' }}>
                 {i > 0 && <button className="sm g" onClick={() => void run(() => api.put(`/api/candidates/${c.id}`, { stage: i - 1 }))}>←</button>}
                 {i < 3 && <button className="sm" onClick={() => void run(() => api.put(`/api/candidates/${c.id}`, { stage: i + 1 }))}>→</button>}
                 <button className="sm r" onClick={() => void run(() => api.del(`/api/candidates/${c.id}`))}>×</button>
-              </div></div>))}
+              </div>}</div>))}
         </div>); })}</div>
     </div>
   </>;
@@ -288,8 +288,8 @@ export function Performance() {
       <tbody>{emps.map(e => { const r = reviews[e.id] || 0; return (
         <tr key={e.id}><td>{e.name}</td><td>{e.dept}</td>
           <td>{[1, 2, 3, 4, 5].map(n => (
-            <span key={n} style={{ cursor: 'pointer', fontSize: 20, color: n <= r ? '#f5a623' : 'var(--bd)' }}
-              onClick={() => void run(() => api.put(`/api/reviews/${e.id}`, { score: n }))}>★</span>))}</td>
+            <span key={n} style={{ cursor: auth.role() === 'viewer' ? 'default' : 'pointer', fontSize: 20, color: n <= r ? '#f5a623' : 'var(--bd)' }}
+              onClick={() => { if (auth.role() !== 'viewer') void run(() => api.put(`/api/reviews/${e.id}`, { score: n })); }}>★</span>))}</td>
           <td>{r >= 4 ? <span className="tag ok">Xuất sắc</span> : r === 3 ? <span className="tag wa">Đạt</span>
             : r ? <span className="tag er">Cần cải thiện</span> : 'Chưa đánh giá'}</td></tr>); })}
       </tbody></table></div></div>
@@ -310,12 +310,109 @@ export function Reports() {
   </>;
 }
 
+export function TrainingPage() {
+  const { emps, trainings } = useData(); const run = useAction();
+  const [eid, setEid] = useState(emps[0]?.id ?? 0);
+  const [title, setTitle] = useState(''), [description, setDescription] = useState('');
+  const [from, setFrom] = useState(today()), [to, setTo] = useState(today());
+  const canEdit = auth.role() !== 'viewer';
+  const employeeName = (id: number) => emps.find(e => e.id === id)?.name ?? 'Không rõ';
+  const add = () => {
+    if (!eid) return alert('Cần có nhân viên trước khi tạo khóa đào tạo');
+    if (!title.trim() || to < from) return alert('Nhập tên khóa học và kiểm tra ngày đào tạo');
+    void run(async () => {
+      await api.post('/api/trainings', { eid, title: title.trim(), description, from_date: from, to_date: to });
+      setTitle(''); setDescription('');
+    });
+  };
+  return <>
+    <h1>Đào tạo</h1>
+    {canEdit && <div className="card">
+      <h3>Thêm khóa đào tạo cho nhân viên</h3>
+      <div className="bar">
+        <select value={eid} onChange={e => setEid(Number(e.target.value))}>
+          {emps.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
+        <input placeholder="Tên khóa đào tạo" value={title} onChange={e => setTitle(e.target.value)} />
+        <input type="date" aria-label="Ngày bắt đầu" value={from} onChange={e => setFrom(e.target.value)} />
+        <input type="date" aria-label="Ngày kết thúc" value={to} onChange={e => setTo(e.target.value)} />
+        <input placeholder="Mô tả" value={description} onChange={e => setDescription(e.target.value)} />
+        <button disabled={!emps.length} onClick={add}>Thêm khóa</button>
+      </div>
+    </div>}
+    <div className="card"><div className="tw"><table>
+      <thead><tr><th>Khóa đào tạo</th><th>Nhân viên</th><th>Từ ngày</th><th>Đến ngày</th><th>Mô tả</th><th>Trạng thái</th>{canEdit && <th></th>}</tr></thead>
+      <tbody>{trainings.map(t => <tr key={t.id}>
+        <td>{t.title}</td><td>{employeeName(t.eid)}</td><td>{t.from_date}</td><td>{t.to_date}</td><td>{t.description}</td>
+        <td>{canEdit
+          ? <select value={t.status} onChange={e => void run(() => api.put(`/api/trainings/${t.id}`, { status: e.target.value }))}>
+            {['Lên kế hoạch', 'Đang học', 'Hoàn thành'].map(s => <option key={s}>{s}</option>)}
+          </select>
+          : <span className="tag">{t.status}</span>}</td>
+        {canEdit && <td><button className="sm r" onClick={() => {
+          if (confirm('Xóa khóa đào tạo này?')) void run(() => api.del(`/api/trainings/${t.id}`));
+        }}>Xóa</button></td>}
+      </tr>)}
+      {!trainings.length && <tr><td colSpan={canEdit ? 7 : 6}>Chưa có khóa đào tạo</td></tr>}
+      </tbody></table></div></div>
+  </>;
+}
+
+export function Notifications() {
+  const { notifications } = useData(); const run = useAction();
+  const unread = notifications.filter(n => !n.read_at).length;
+  return <>
+    <h1>Thông báo</h1>
+    <div className="card">
+      <div className="bar"><span>{unread} thông báo chưa đọc</span>
+        {unread > 0 && <button className="g" onClick={() => void run(() => api.post('/api/notifications/read-all'))}>Đánh dấu đã đọc tất cả</button>}
+      </div>
+      <div className="tw"><table>
+        <thead><tr><th>Trạng thái</th><th>Thông báo</th><th>Nội dung</th><th>Thời gian</th><th></th></tr></thead>
+        <tbody>{notifications.map(n => <tr key={n.id}>
+          <td><span className={`tag ${n.read_at ? '' : 'wa'}`}>{n.read_at ? 'Đã đọc' : 'Mới'}</span></td>
+          <td>{n.title}</td><td>{n.message}</td><td>{new Date(n.created_at).toLocaleString('vi-VN')}</td>
+          <td>{!n.read_at && <button className="sm g" onClick={() => void run(() => api.put(`/api/notifications/${n.id}`, {}))}>Đã đọc</button>}{' '}
+            {auth.role() !== 'viewer' && <button className="sm r" onClick={() => void run(() => api.del(`/api/notifications/${n.id}`))}>Xóa</button>}</td>
+        </tr>)}
+        {!notifications.length && <tr><td colSpan={5}>Chưa có thông báo</td></tr>}
+        </tbody></table></div>
+    </div>
+  </>;
+}
+
+const ROLE_NAMES: Record<User['role'], string> = { admin: 'Quản trị viên', hr: 'Nhân sự', viewer: 'Chỉ xem' };
+const ROLE_ACCESS: [string, string, string, string][] = [
+  ['Tổng quan, nhân viên, phòng ban', 'Xem/sửa', 'Xem/sửa', 'Chỉ xem'],
+  ['Chấm công, nghỉ phép', 'Xem/sửa', 'Xem/sửa', 'Chỉ xem'],
+  ['Lương, đánh giá, tuyển dụng, đào tạo', 'Xem/sửa', 'Xem/sửa', 'Chỉ xem'],
+  ['Báo cáo, thông báo', 'Xem/sửa', 'Xem/sửa', 'Xem/đọc thông báo'],
+  ['Quản lý tài khoản, đặt lại dữ liệu', 'Đầy đủ', 'Không', 'Không'],
+];
+
 export function Settings({ user, theme, onSave, onLogout }: { user: string; theme: string; onSave: (u: string, t: string) => void; onLogout: () => void }) {
   const { reload } = useData(); const run = useAction();
   const [u, setU] = useState(user), [t, setT] = useState(theme);
+  const [users, setUsers] = useState<User[]>([]);
+  const [accountError, setAccountError] = useState('');
+  const [username, setUsername] = useState(''), [password, setPassword] = useState(''), [role, setRole] = useState<User['role']>('hr');
+  const loadUsers = async () => {
+    try { setUsers(await api.get<User[]>('/api/users')); setAccountError(''); }
+    catch (e) { setAccountError(e instanceof Error ? e.message : 'Không tải được tài khoản'); }
+  };
+  useEffect(() => { void loadUsers(); }, []);
+  const manage = async (fn: () => Promise<unknown>) => { if (await run(fn)) await loadUsers(); };
   const reset = () => { if (confirm('Xóa toàn bộ dữ liệu về mặc định?')) void run(() => api.post('/api/reset')).then(() => { void reload(); }); };
+  const addUser = () => {
+    if (!username.trim() || password.length < 8) return alert('Nhập tên đăng nhập và mật khẩu ít nhất 8 ký tự');
+    void manage(async () => {
+      await api.post('/api/users', { username: username.trim(), password, role });
+      setUsername(''); setPassword('');
+    });
+  };
+  const currentUsername = auth.username();
   return <>
-    <h1>Cài đặt</h1>
+    <h1>Cài đặt &amp; Phân quyền</h1>
     <div className="card">
       <div className="f">
         <label>Tên hiển thị<input value={u} onChange={e => setU(e.target.value)} /></label>
@@ -327,6 +424,50 @@ export function Settings({ user, theme, onSave, onLogout }: { user: string; them
         <button className="r" onClick={reset}>Đặt lại dữ liệu</button>
         <button className="g" onClick={onLogout}>Đăng xuất</button>
       </div>
+    </div>
+    <div className="card">
+      <h3>Vai trò và quyền</h3>
+      <p>Quyền được kiểm tra ở máy chủ; tài khoản chỉ xem không thể gọi API ghi dữ liệu.</p>
+      <div className="tw"><table>
+        <thead><tr><th>Phạm vi</th><th>Quản trị viên</th><th>Nhân sự</th><th>Chỉ xem</th></tr></thead>
+        <tbody>{ROLE_ACCESS.map(row => <tr key={row[0]}>{row.map((v, i) => <td key={i}>{v}</td>)}</tr>)}</tbody>
+      </table></div>
+    </div>
+    <div className="card">
+      <h3>Tài khoản</h3>
+      <div className="bar">
+        <input placeholder="Tên đăng nhập" value={username} onChange={e => setUsername(e.target.value)} />
+        <input type="password" placeholder="Mật khẩu (ít nhất 8 ký tự)" value={password} onChange={e => setPassword(e.target.value)} />
+        <select value={role} onChange={e => setRole(e.target.value as User['role'])}>
+          {Object.entries(ROLE_NAMES).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+        </select>
+        <button onClick={addUser}>Tạo tài khoản</button>
+      </div>
+      {accountError && <p role="alert">{accountError}</p>}
+      <div className="tw"><table>
+        <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Hoạt động</th><th></th></tr></thead>
+        <tbody>{users.map(item => {
+          const isSelf = item.username === currentUsername;
+          return <tr key={item.id}>
+            <td>{item.username}{isSelf ? ' (đang đăng nhập)' : ''}</td>
+            <td><select value={item.role} disabled={isSelf} onChange={e => void manage(() => api.put(`/api/users/${item.id}`, { role: e.target.value }))}>
+              {Object.entries(ROLE_NAMES).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select></td>
+            <td><input aria-label={`Tài khoản ${item.username} hoạt động`} type="checkbox" checked={Boolean(item.active)} disabled={isSelf}
+              onChange={e => void manage(() => api.put(`/api/users/${item.id}`, { active: e.target.checked }))} /></td>
+            <td>{!isSelf && <>
+              <button className="sm g" onClick={() => {
+                const nextPassword = prompt(`Mật khẩu mới cho ${item.username} (ít nhất 8 ký tự):`);
+                if (nextPassword) void manage(() => api.put(`/api/users/${item.id}`, { password: nextPassword }));
+              }}>Đặt lại mật khẩu</button>{' '}
+              <button className="sm r" onClick={() => {
+                if (confirm(`Xóa tài khoản ${item.username}?`)) void manage(() => api.del(`/api/users/${item.id}`));
+              }}>Xóa</button>
+            </>}</td>
+          </tr>;
+        })}
+        {!users.length && <tr><td colSpan={4}>Chưa tải được danh sách tài khoản</td></tr>}
+        </tbody></table></div>
     </div>
   </>;
 }

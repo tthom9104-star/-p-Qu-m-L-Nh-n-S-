@@ -6,8 +6,10 @@ import logo from './assets/logo.svg';
 import './App.css';
 
 const NAV: [string, string][] = [
-  ['dashboard', 'Tổng quan'], ['employees', 'Nhân viên'], ['emp-form', 'Thêm nhân viên'], ['departments', 'Phòng ban'],
-  ['attendance', 'Chấm công'], ['leave', 'Nghỉ phép'], ['settings', 'Cài đặt'],
+  ['dashboard', 'Tổng quan'], ['employees', 'Quản lý nhân viên'], ['emp-form', 'Thêm nhân viên'], ['departments', 'Phòng ban'],
+  ['attendance', 'Chấm công'], ['leave', 'Nghỉ phép'], ['payroll', 'Tiền lương'], ['performance', 'Đánh giá nhân viên'],
+  ['recruitment', 'Tuyển dụng'], ['training', 'Đào tạo'], ['reports', 'Báo cáo – Thống kê'],
+  ['notifications', 'Thông báo'], ['settings', 'Cài đặt & Phân quyền'],
 ];
 
 function useHash() {
@@ -21,7 +23,10 @@ function Login({ onOk }: { onOk: () => void }) {
   const submit = async () => {
     if (!u.trim() || !pw) return alert('Vui lòng nhập tài khoản và mật khẩu');
     setBusy(true);
-    try { const r = await api.post<{ token: string }>('/api/auth/login', { username: u.trim(), password: pw }); auth.set(r.token); onOk(); }
+    try {
+      const r = await api.post<{ token: string; username: string; role: string }>('/api/auth/login', { username: u.trim(), password: pw });
+      auth.set(r.token); auth.setUser(r.username, r.role); onOk();
+    }
     catch (e) { alert(e instanceof Error ? e.message : 'Đăng nhập thất bại'); }
     setBusy(false);
   };
@@ -37,7 +42,10 @@ function Login({ onOk }: { onOk: () => void }) {
 }
 
 function Shell({ page, param, onLogout }: { page: string; param: string; onLogout: () => void }) {
-  const { loading, loaded, error, reload } = useData();
+  const { loading, loaded, error, reload, notifications } = useData();
+  const role = auth.role();
+  const canManageUsers = role === 'admin';
+  const canEdit = role !== 'viewer';
   const [user, setUser] = useState(localStorage.getItem('user') || 'Admin');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || '');
   useEffect(() => { if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme; }, [theme]);
@@ -45,20 +53,26 @@ function Shell({ page, param, onLogout }: { page: string; param: string; onLogou
   const pages: Record<string, ReactElement> = {
     dashboard: <P.Dashboard user={user} />, employees: <P.Employees />, 'emp-form': <P.EmployeeForm key={param || 'new'} id={Number(param) || 0} />,
     departments: <P.Departments />, attendance: <P.AttendancePage />, leave: <P.LeavePage />,
+    payroll: <P.Payroll />, performance: <P.Performance />, recruitment: <P.Recruitment />,
+    training: <P.TrainingPage />, reports: <P.Reports />, notifications: <P.Notifications />,
     settings: <P.Settings user={user} theme={theme} onSave={(u, t) => { localStorage.setItem('user', u); localStorage.setItem('theme', t); setUser(u); setTheme(t); }} onLogout={onLogout} />,
   };
+  const visibleNav = NAV.filter(([key]) => (key !== 'settings' || canManageUsers) && (key !== 'emp-form' || canEdit));
+  const unread = notifications.filter(n => !n.read_at).length;
   return (
     <div className="app">
       <aside>
         <div className="logo"><img src={logo} alt="" style={{ height: 22, verticalAlign: 'middle', marginRight: 8 }} />Coral HR</div>
-        {NAV.map(([k, l]) => <a key={k} href={`#${k}`} className={k === page ? 'on' : ''}>{l}</a>)}
+        {visibleNav.map(([k, l]) => <a key={k} href={`#${k}`} className={k === page ? 'on' : ''}>{l}{k === 'notifications' && unread > 0 ? ` (${unread})` : ''}</a>)}
       </aside>
       <main>
         {loading ? <p>Đang tải dữ liệu...</p> : error && !loaded
           ? <div className="card"><h3>Không kết nối được máy chủ</h3><p>{error}</p><button onClick={() => void reload()}>Thử lại</button></div>
           : <>
             {error && <div className="card"><b>Không làm mới được dữ liệu:</b> {error} <button className="sm" onClick={() => void reload()}>Thử lại</button></div>}
-            {pages[page] ?? pages.dashboard}
+            {!canManageUsers && page === 'settings' ? <div className="card">Bạn không có quyền truy cập mục này.</div>
+              : !canEdit && page === 'emp-form' ? <div className="card">Tài khoản chỉ có quyền xem.</div>
+                : pages[page] ?? pages.dashboard}
           </>}
       </main>
     </div>
