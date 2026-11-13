@@ -7,8 +7,7 @@ import './App.css';
 
 const NAV: [string, string][] = [
   ['dashboard', 'Tổng quan'], ['employees', 'Nhân viên'], ['emp-form', 'Thêm nhân viên'], ['departments', 'Phòng ban'],
-  ['attendance', 'Chấm công'], ['leave', 'Nghỉ phép'], ['payroll', 'Bảng lương'], ['recruitment', 'Tuyển dụng'],
-  ['performance', 'Đánh giá'], ['reports', 'Báo cáo'], ['settings', 'Cài đặt'],
+  ['attendance', 'Chấm công'], ['leave', 'Nghỉ phép'], ['settings', 'Cài đặt'],
 ];
 
 function useHash() {
@@ -45,8 +44,7 @@ function Shell({ page, param, onLogout }: { page: string; param: string; onLogou
 
   const pages: Record<string, ReactElement> = {
     dashboard: <P.Dashboard user={user} />, employees: <P.Employees />, 'emp-form': <P.EmployeeForm key={param || 'new'} id={Number(param) || 0} />,
-    departments: <P.Departments />, attendance: <P.AttendancePage />, leave: <P.LeavePage />, payroll: <P.Payroll />,
-    recruitment: <P.Recruitment />, performance: <P.Performance />, reports: <P.Reports />,
+    departments: <P.Departments />, attendance: <P.AttendancePage />, leave: <P.LeavePage />,
     settings: <P.Settings user={user} theme={theme} onSave={(u, t) => { localStorage.setItem('user', u); localStorage.setItem('theme', t); setUser(u); setTheme(t); }} onLogout={onLogout} />,
   };
   return (
